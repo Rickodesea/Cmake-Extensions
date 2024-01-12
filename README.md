@@ -4,6 +4,7 @@
 
 Copy files from one directory to another directory.  
 The output directory is created if it doesn't exist.
+See [Source](Source/) for examples.
 
 * FILE copy only files
 * FOLDER copy files along with their folder structure
@@ -13,6 +14,7 @@ The output directory is created if it doesn't exist.
 * RECURSIVE copy files from subdirectory
 * ONLY filter for files that matches the regex
 * EXCEPT filter against files that matches the regex
+
 
 ```cmake
 add_subdirectory(../.. Build/Debug/CxCopy)
