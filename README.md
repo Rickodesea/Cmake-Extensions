@@ -7,6 +7,8 @@ The output directory is created if it doesn't exist.
 
 * FILE copy only files
 * FOLDER copy files along with their folder structure
+* INPUT input folder
+* OUTPUT output folder
 * VAR store the list of copied files (destination)
 * RECURSIVE copy files from subdirectory
 * ONLY filter for files that matches the regex
