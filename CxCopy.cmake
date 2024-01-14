@@ -51,7 +51,7 @@ function(CxCopyInternCopy outvar files filterval inval relval inputval outputval
     add_custom_command(OUTPUT "${_bin_hdr}"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_hdr}" "${_bin_hdr}"
         DEPENDS "${_hdr}")
-    message("target copying: ${_name}")
+    #message("target copying: ${_name}")
   endforeach()
   set(${outvar} ${temp_output} PARENT_SCOPE)
 endfunction()
