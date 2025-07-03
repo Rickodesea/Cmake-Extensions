@@ -59,6 +59,33 @@ add_custom_target(FolderCopyFilterOutR ALL DEPENDS ${files} COMMENT "CxCopy File
 
 ```
 
+## CxCopy2
+
+An enhanced version of `CxCopy` that supports **target-aware** file copying using `add_custom_command(TARGET ... POST_BUILD ...)`.
+
+This allows you to automatically copy files after building a target, without needing to create a custom target and manage dependencies manually.
+
+### Key Additions
+
+- All features of `CxCopy` are retained.
+- You can now specify a target as the first argument.
+- If a valid target is passed, `POST_BUILD` copy hooks are added to that target.
+- Otherwise, it behaves like the original `CxCopy` with a `VAR`-based dependency list.
+
+### Usage
+
+```cmake
+add_executable(MyApp main.c)
+
+CxCopy(MyApp FILE INPUT "${CMAKE_SOURCE_DIR}/Data/CxCopy2" OUTPUT "${CMAKE_BINARY_DIR}/OutCopy" COMMENT "Copying data post-build")
+
+## CxFileCopy
+
+A simpler function that focuses on copying a single file from one location to another
+
+## Please note the samples for CxCopy2 and CxFileCopy is not complete yet but you can start using both functions now.
+
+
 ## License
 This project is licensed under the mit license - see the [LICENSE](LICENSE) file for details.
 © All rights reserved.
