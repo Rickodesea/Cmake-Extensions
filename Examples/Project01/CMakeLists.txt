@@ -21,6 +21,7 @@ CxCopy(main
     INPUT ${CMAKE_SOURCE_DIR}/Data/Images
     OUTPUT ${CMAKE_BINARY_DIR}/ImageBinaries
     FILE
+    COMMENT "Copy all images to bin folder"
 )
 
 # File copy operations
@@ -52,7 +53,6 @@ CxCopy(main FOLDER RECURSIVE INPUT "${CMAKE_SOURCE_DIR}/Data/General" OUTPUT "${
 CxFileCopy(core
     INPUT $<TARGET_FILE:core>
     OUTPUT ${CMAKE_BINARY_DIR}/$<TARGET_FILE_NAME:core>
-    COMMENT "Copying built core library to build root"
 )
 
 # main exe is built in build/Examples/Project01

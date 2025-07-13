@@ -33,8 +33,8 @@ endfunction()
 
 function(CxFileCopy target)
     set(req_params INPUT OUTPUT)
-    set(single_values ${req_params})
-    set(opt_params COMMENT)
+    set(single_values ${req_params} COMMENT)  # COMMENT must be in single_values
+    set(opt_params)  # Empty since COMMENT is in single_values
     set(multi_values)
     set(options)
 
@@ -59,7 +59,7 @@ function(CxFileCopy target)
     CxInternalGetRelPath("${dst}" display_output)
 
     set(comment_text "CxFileCopy(${target}): Copying ${display_input} to ${display_output}")
-    if(parsed_COMMENT)
+    if(DEFINED parsed_COMMENT AND NOT "${parsed_COMMENT}" STREQUAL "")
         set(comment_text "${parsed_COMMENT}")
     endif()
 
