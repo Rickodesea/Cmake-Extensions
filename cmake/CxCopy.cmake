@@ -1,3 +1,42 @@
+# CxCopy - Copy files/folders with filtering options
+#
+# Usage:
+#   CxCopy(<target>
+#       [FILE|FOLDER]
+#       [RECURSIVE]
+#       INPUT <input_path>
+#       OUTPUT <output_path>
+#       [ONLY <regex>]
+#       [EXCEPT <regex>]
+#       [VAR <output_var>]  # Optional output variable for copied files
+#       [COMMENT <message>] # Optional custom comment message
+#   )
+#
+# Parameters:
+#   target     - Target to associate the copy operations with
+#   FILE       - Copy files only (exclude directories)
+#   FOLDER     - Copy files and directories
+#   RECURSIVE  - Recursively copy contents
+#   INPUT      - Source directory to copy from
+#   OUTPUT     - Destination directory to copy to
+#   ONLY       - Regex pattern to include only matching files
+#   EXCEPT     - Regex pattern to exclude matching files
+#   COMMENT    - Optional custom comment message
+
+#####################################
+## Internal helper functions
+#####################################
+
+function(CxInternalGetRelPath path out_var)
+  string(REGEX MATCH "\\$<.*>" is_gen "${path}")
+  if(is_gen)
+    set(${out_var} "${path}" PARENT_SCOPE)
+  else()
+    file(RELATIVE_PATH result "${CMAKE_SOURCE_DIR}" "${path}")
+    set(${out_var} "${result}" PARENT_SCOPE)
+  endif()
+endfunction()
+
 function(CxCopyInternRemoveDir outvar files)
     set(input ${${files}})
     foreach(_hdr IN LISTS input)
@@ -20,7 +59,10 @@ macro(CxCopyInternSetFilterAndIn filter in)
     endif()
 endmacro()
 
-function(CxCopyInternCopy target use_target outvar files filterval inval relval inputval outputval)
+function(CxCopyInternCopy target use_target outvar files filterval inval relval inputval outputval comment type)
+    CxInternalGetRelPath(${inputval} display_input)
+    CxInternalGetRelPath(${outputval} display_output)
+
     set(temp_input ${${files}})  
     if(filterval AND NOT filterval STREQUAL "*")
         foreach(_hdr IN LISTS temp_input)
@@ -46,30 +88,39 @@ function(CxCopyInternCopy target use_target outvar files filterval inval relval 
         set(_bin_hdr "${outputval}/${_name}")
         list(APPEND temp_output "${_bin_hdr}")
 
+        # Set default comment if not provided
+        if(NOT comment)
+            set(comment "CxCopy(${target}): Copying ${type} ${display_input}/${_name} to ${display_output}")
+        endif()
+
         if(${use_target})
             add_custom_command(
                 TARGET ${target} POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_hdr}" "${_bin_hdr}"
-                COMMENT "CxCopy (target): Copying ${_hdr} to ${_bin_hdr}"
+                COMMENT "${comment}"
             )
         else()
             add_custom_command(
                 OUTPUT "${_bin_hdr}"
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_hdr}" "${_bin_hdr}"
                 DEPENDS "${_hdr}"
-                COMMENT "CxCopy: Copying ${_hdr} to ${_bin_hdr}"
+                COMMENT "${comment}"
             )
         endif()
     endforeach()
     set(${outvar} ${temp_output} PARENT_SCOPE)
 endfunction()
 
+#####################################
+## Main CxCopy function
+#####################################
+
 function(CxCopy target)
     set(entry_modifier FILE FOLDER)
     set(recurse_modifier RECURSIVE)
     set(options ${entry_modifier} ${recurse_modifier})
     set(req_params INPUT OUTPUT)
-    set(single_values ${req_params} VAR)
+    set(single_values ${req_params} VAR COMMENT)
     set(opt_params ONLY EXCEPT)
     set(multi_values ${opt_params})
 
@@ -104,7 +155,7 @@ function(CxCopy target)
     endif()
 
     if(parsed_UNPARSED_ARGUMENTS)
-        message(WARNING "Following parameters are unrecognized: ${parsed_KEYWORDS_MISSING_VALUES}")
+        message(WARNING "Following parameters are unrecognized: ${parsed_UNPARSED_ARGUMENTS}")
     endif()
 
     string(COMPARE EQUAL ${parsed_INPUT} "" input_EMPTY)
@@ -122,48 +173,44 @@ function(CxCopy target)
 
     if(parsed_FILE)
         if(parsed_RECURSIVE)
-            message(STATUS "CxCopy: Copying files from ${input} recursively to ${output}")
             file(GLOB_RECURSE input_files "${input}/*")
             CxCopyInternRemoveDir(filesonly input_files)
             CxCopyInternSetFilterAndIn(filter in)
             set(relative FALSE)
             CxCopyInternCopy(${target} ${use_target} filtered_files
-                filesonly ${filter} ${in} ${relative} ${input} ${output})
+                filesonly ${filter} ${in} ${relative} ${input} ${output} "${parsed_COMMENT}" "FILE")
             if(parsed_VAR)
                 set(${parsed_VAR} ${filtered_files} PARENT_SCOPE)
             endif()
         else()
-            message(STATUS "CxCopy: Copying files from ${input} to ${output}")
             file(GLOB input_files "${input}/*")
             CxCopyInternRemoveDir(filesonly input_files)
             CxCopyInternSetFilterAndIn(filter in)
             set(relative FALSE)
             CxCopyInternCopy(${target} ${use_target} filtered_files
-                filesonly ${filter} ${in} ${relative} ${input} ${output})
+                filesonly ${filter} ${in} ${relative} ${input} ${output} "${parsed_COMMENT}" "FILE")
             if(parsed_VAR)
                 set(${parsed_VAR} ${filtered_files} PARENT_SCOPE)
             endif()
         endif()
     elseif(parsed_FOLDER)
         if(parsed_RECURSIVE)
-            message(STATUS "CxCopy: Copying files and directories from ${input} recursively to ${output}")
             file(GLOB_RECURSE input_files "${input}/*")
             set(filesanddirs ${input_files})
             CxCopyInternSetFilterAndIn(filter in)
             set(relative TRUE)
             CxCopyInternCopy(${target} ${use_target} filtered_files
-                filesanddirs ${filter} ${in} ${relative} ${input} ${output})
+                filesanddirs ${filter} ${in} ${relative} ${input} ${output} "${parsed_COMMENT}" "FOLDER")
             if(parsed_VAR)
                 set(${parsed_VAR} ${filtered_files} PARENT_SCOPE)
             endif()
         else()
-            message(STATUS "CxCopy: Copying files and directories from ${input} to ${output}")
             file(GLOB input_files "${input}/*")
             set(filesanddirs ${input_files})
             CxCopyInternSetFilterAndIn(filter in)
             set(relative TRUE)
             CxCopyInternCopy(${target} ${use_target} filtered_files
-                filesanddirs ${filter} ${in} ${relative} ${input} ${output})
+                filesanddirs ${filter} ${in} ${relative} ${input} ${output} "${parsed_COMMENT}" "FOLDER")
             if(parsed_VAR)
                 set(${parsed_VAR} ${filtered_files} PARENT_SCOPE)
             endif()

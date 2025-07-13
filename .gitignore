@@ -78,6 +78,7 @@ cmake-build-release/
 
 # Build
 Build/
+build/
 
 # Node
 node_modules/
