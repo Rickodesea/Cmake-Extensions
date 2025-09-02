@@ -48,14 +48,14 @@ function(CxCopyInternRemoveDir outvar files)
 endfunction()
 
 macro(CxCopyInternSetFilterAndIn filter in)
-    set(filter "*")
-    set(in TRUE)
+    set(${filter} "")
+    set(${in} TRUE)
     if(parsed_ONLY)
-        set(filter ${parsed_ONLY})
+        set(${filter} ${parsed_ONLY})
     endif()
     if(parsed_EXCEPT)
-        set(filter ${parsed_EXCEPT})
-        set(in FALSE)
+        set(${filter} ${parsed_EXCEPT})
+        set(${in} FALSE)
     endif()
 endmacro()
 
@@ -63,8 +63,13 @@ function(CxCopyInternCopy target use_target outvar files filterval inval relval 
     CxInternalGetRelPath(${inputval} display_input)
     CxInternalGetRelPath(${outputval} display_output)
 
-    set(temp_input ${${files}})  
-    if(filterval AND NOT filterval STREQUAL "*")
+    set(temp_input ${${files}})
+
+    # Remove duplicates to prevent multiple copies of the same file
+    list(REMOVE_DUPLICATES temp_input)
+
+    # Apply ONLY/EXCEPT filtering if provided
+    if(filterval AND NOT filterval STREQUAL "")
         foreach(_hdr IN LISTS temp_input)
             if(_hdr MATCHES ${filterval})
                 if(NOT ${inval})
@@ -79,6 +84,8 @@ function(CxCopyInternCopy target use_target outvar files filterval inval relval 
     endif()
 
     set(temp_output)
+
+    # Prepare outputs
     foreach(_hdr IN LISTS temp_input)
         if(relval)
             cmake_path(RELATIVE_PATH _hdr BASE_DIRECTORY "${inputval}" OUTPUT_VARIABLE _name)
@@ -87,29 +94,54 @@ function(CxCopyInternCopy target use_target outvar files filterval inval relval 
         endif()
         set(_bin_hdr "${outputval}/${_name}")
         list(APPEND temp_output "${_bin_hdr}")
+    endforeach()
 
-        # Set default comment if not provided
-        if(NOT comment)
-            set(comment "CxCopy(${target}): Copying ${type} ${display_input}/${_name} to ${display_output}")
-        endif()
+    # Default comment if none provided
+    if(NOT comment)
+        set(comment "CxCopy(${target}): Copying ${type}(s) from ${display_input} to ${display_output}")
 
-        if(${use_target})
-            add_custom_command(
-                TARGET ${target} POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_hdr}" "${_bin_hdr}"
-                COMMENT "${comment}"
-            )
-        else()
+        # Build a pretty-printed file list
+        set(file_list "")
+        foreach(_hdr IN LISTS temp_input)
+            get_filename_component(_name "${_hdr}" NAME)
+            string(APPEND file_list "\n- ${_name}")
+        endforeach()
+
+        string(APPEND comment "${file_list}")
+    endif()
+
+
+    # === Handle target-bound vs standalone copy ===
+    if(${use_target})
+        # Batch copy all files in a single POST_BUILD command
+        add_custom_command(
+            TARGET ${target} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${outputval}"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${temp_input} "${outputval}"
+            COMMENT "${comment}"
+        )
+    else()
+        # Standalone: still define per-file outputs so dependencies can track them
+        list(LENGTH temp_input num_files)
+        math(EXPR last_index "${num_files} - 1")
+
+        foreach(idx RANGE ${last_index})
+            list(GET temp_input ${idx} _hdr)
+            list(GET temp_output ${idx} _bin_hdr)
+
             add_custom_command(
                 OUTPUT "${_bin_hdr}"
+                COMMAND ${CMAKE_COMMAND} -E make_directory "${outputval}"
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_hdr}" "${_bin_hdr}"
                 DEPENDS "${_hdr}"
-                COMMENT "${comment}"
+                COMMENT "${comment}: ${_hdr}"
             )
-        endif()
-    endforeach()
+        endforeach()
+    endif()
+
     set(${outvar} ${temp_output} PARENT_SCOPE)
 endfunction()
+
 
 #####################################
 ## Main CxCopy function
@@ -178,7 +210,7 @@ function(CxCopy target)
             CxCopyInternSetFilterAndIn(filter in)
             set(relative FALSE)
             CxCopyInternCopy(${target} ${use_target} filtered_files
-                filesonly ${filter} ${in} ${relative} ${input} ${output} "${parsed_COMMENT}" "FILE")
+                filesonly "${filter}" ${in} ${relative} ${input} ${output} "${parsed_COMMENT}" "FILE")
             if(parsed_VAR)
                 set(${parsed_VAR} ${filtered_files} PARENT_SCOPE)
             endif()
@@ -188,7 +220,7 @@ function(CxCopy target)
             CxCopyInternSetFilterAndIn(filter in)
             set(relative FALSE)
             CxCopyInternCopy(${target} ${use_target} filtered_files
-                filesonly ${filter} ${in} ${relative} ${input} ${output} "${parsed_COMMENT}" "FILE")
+                filesonly "${filter}" ${in} ${relative} ${input} ${output} "${parsed_COMMENT}" "FILE")
             if(parsed_VAR)
                 set(${parsed_VAR} ${filtered_files} PARENT_SCOPE)
             endif()
@@ -200,7 +232,7 @@ function(CxCopy target)
             CxCopyInternSetFilterAndIn(filter in)
             set(relative TRUE)
             CxCopyInternCopy(${target} ${use_target} filtered_files
-                filesanddirs ${filter} ${in} ${relative} ${input} ${output} "${parsed_COMMENT}" "FOLDER")
+                filesanddirs "${filter}" ${in} ${relative} ${input} ${output} "${parsed_COMMENT}" "FOLDER")
             if(parsed_VAR)
                 set(${parsed_VAR} ${filtered_files} PARENT_SCOPE)
             endif()
@@ -210,7 +242,7 @@ function(CxCopy target)
             CxCopyInternSetFilterAndIn(filter in)
             set(relative TRUE)
             CxCopyInternCopy(${target} ${use_target} filtered_files
-                filesanddirs ${filter} ${in} ${relative} ${input} ${output} "${parsed_COMMENT}" "FOLDER")
+                filesanddirs "${filter}" ${in} ${relative} ${input} ${output} "${parsed_COMMENT}" "FOLDER")
             if(parsed_VAR)
                 set(${parsed_VAR} ${filtered_files} PARENT_SCOPE)
             endif()
